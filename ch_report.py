@@ -3,7 +3,7 @@ from clickhouse_driver import connect
 from clickhouse_driver import Client
 import threading
 import time
-import queue
+import Queue as queue
 from datetime import datetime
 from clickhouse_driver import errors as e1
 from clickhouse_driver.dbapi import errors as e2
@@ -13,7 +13,7 @@ import argparse
 from pkg_resources import parse_version as version
 
 
-CH_DIAG_VERSION = '0.7'
+RAPTOR_DIAG_VERSION = '21.3'
 
 
 class TaskQueue:
@@ -84,7 +84,7 @@ def worker_func(thread_name, conf, task_queue):
                 do_work = False
         except (
                 EOFError,
-                ConnectionAbortedError,
+                OSError,
                 e1.NetworkError
         ) as e:
             if task is not None:
@@ -107,7 +107,6 @@ def get_specific_sql(cluster_version, items):
         if version(item[0]) <= cluster_version < version(item[1]):
             return item[2]
 
-
 def build_report_for_cluster(conf, cluster_name, report_struct, threads_num=1):
     task_queue = TaskQueue()
     databases = None
@@ -129,7 +128,7 @@ def build_report_for_cluster(conf, cluster_name, report_struct, threads_num=1):
 
             report_struct['description'] = '<b>Collecting datetime:</b> %s, <b>ch_diag version:</b> %s %s' % (
                 now.strftime("%d/%m/%Y %H:%M:%S"),
-                CH_DIAG_VERSION,
+                RAPTOR_DIAG_VERSION,
                 "<br><br>" + "".join(
                     [k + " = " + str(v) + "<br>" for k, v in conf.conn_params.items() if k not in ('user', 'password')]
                 ) if conf.args.add_params_to_report else ""
@@ -141,12 +140,12 @@ def build_report_for_cluster(conf, cluster_name, report_struct, threads_num=1):
                         for report_i_k, report_i_v in report_v.items():
                             for report_item_k, report_item_v in report_i_v.items():
                                 if report_item_k == 'report_sql':
-                                    sql_file = None
+                                    #sql_file = None
+                                    sql_file = report_item_v
                                     if isinstance(report_item_v, list):
                                         sql_file = get_specific_sql(conf.cluster_version, report_item_v)
                                     if isinstance(report_item_v, str):
                                         sql_file = report_item_v
-
                                     with open(os.path.join(conf.current_dir, 'sql', section_k, sql_file)) as f:
                                         sql = f.read()
                                     sql = sql.replace('_CLUSTER_NAME', cluster_name)
@@ -279,7 +278,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--port",
         type=str,
-        default='9010'
+        default='29010'
     )
     parser.add_argument(
         "--database",
@@ -289,7 +288,7 @@ if __name__ == "__main__":
     parser.add_argument(
         "--user",
         type=str,
-        default='default'
+        default='admin'
     )
     parser.add_argument(
         "--password",
@@ -335,7 +334,7 @@ if __name__ == "__main__":
         print("#-----------------------------------")
 
     if args.version:
-        print("Version %s" % CH_DIAG_VERSION)
+        print("Version %s" % RAPTOR_DIAG_VERSION)
         sys.exit(0)
 
     build_reports(SysConf(args))
